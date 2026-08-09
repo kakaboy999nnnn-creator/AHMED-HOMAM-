@@ -32,25 +32,18 @@
         controls.rotateSpeed = 0.6;
         controls.enableZoom = true;
 
-        // --- إضاءة متكاملة ومباشرة ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+        // --- الإضاءة ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         scene.add(ambientLight);
 
-        const light1 = new THREE.PointLight(0x00f0ff, 2, 50);
-        light1.position.set(10, 10, 10);
-        scene.add(light1);
-
-        const light2 = new THREE.PointLight(0xff007f, 2, 50);
-        light2.position.set(-10, -10, -10);
-        scene.add(light2);
-
-        // --- 1. إنشاء الكرة الرئيسية ---
-        const innerSphereGeometry = new THREE.SphereGeometry(2.3, 64, 64);
+        // --- 1. الكوكب الرئيسي "فن يحچي" ---
+        const innerSphereGeometry = new THREE.SphereGeometry(2.1, 64, 64);
         const innerSphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const innerSphere = new THREE.Mesh(innerSphereGeometry, innerSphereMaterial);
+        innerSphere.position.set(-1.0, 0, 0); // موضع الكوكب الرئيسي
         scene.add(innerSphere);
 
-        // تحميل صورة الكرة الرئيسية
+        // تحميل صورة الكوكب الرئيسي
         const loader = new THREE.TextureLoader();
         const imgPath = './myimage.jpg';
         
@@ -69,7 +62,7 @@
             }
         );
 
-        // --- 2. نص "فن يحچي" فوق الكرة الرئيسية ---
+        // --- 2. نص "فن يحچي" فوق الكوكب الرئيسي ---
         const textCanvas = document.createElement('canvas');
         textCanvas.width = 1024;
         textCanvas.height = 256;
@@ -90,32 +83,55 @@
             side: THREE.DoubleSide
         });
 
-        const textGeometry = new THREE.PlaneGeometry(5.2, 1.3);
+        const textGeometry = new THREE.PlaneGeometry(4.8, 1.2);
         const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-        textMesh.position.set(0, 3.5, 0);
+        textMesh.position.set(-1.0, 3.3, 0);
         scene.add(textMesh);
 
-        // --- 3. الكويكب الصغير الجانبي (Asteroid/Planet) ---
-        const asteroidGeometry = new THREE.SphereGeometry(0.8, 32, 32);
-        const asteroidMaterial = new THREE.MeshStandardMaterial({
-            color: 0x80ffea,
-            roughness: 0.4,
-            metalness: 0.6,
-            emissive: 0x112233
+        // --- 3. كويكب Ali الصغير المضيء والواضح تماماً ---
+        // تصميم نقوشات للكويكب باستخدام Canvas ليكون ظاهراً بنفس جودة الكوكب الرئيسي
+        const aliPlanetCanvas = document.createElement('canvas');
+        aliPlanetCanvas.width = 512;
+        aliPlanetCanvas.height = 256;
+        const aliPlanetCtx = aliPlanetCanvas.getContext('2d');
+
+        // خلفية بنفسجي نيون مع تدرج وردي وفيروزي
+        const grad = aliPlanetCtx.createLinearGradient(0, 0, 512, 256);
+        grad.addColorStop(0, '#7209b7');
+        grad.addColorStop(0.5, '#f72585');
+        grad.addColorStop(1, '#4cc9f0');
+        aliPlanetCtx.fillStyle = grad;
+        aliPlanetCtx.fillRect(0, 0, 512, 256);
+
+        // إضافة دوائر ومربعات مضيئة كخامة نيون للكويكب
+        aliPlanetCtx.fillStyle = '#ffffff';
+        for (let i = 0; i < 30; i++) {
+            aliPlanetCtx.beginPath();
+            aliPlanetCtx.arc(Math.random() * 512, Math.random() * 256, Math.random() * 15 + 5, 0, Math.PI * 2);
+            aliPlanetCtx.fill();
+        }
+
+        const aliPlanetTexture = new THREE.CanvasTexture(aliPlanetCanvas);
+        
+        // استخدام MeshBasicMaterial لضمان ظهور الكويكب ساطعاً ومباشراً بدون إظلام
+        const asteroidGeometry = new THREE.SphereGeometry(0.8, 64, 64);
+        const asteroidMaterial = new THREE.MeshBasicMaterial({
+            map: aliPlanetTexture
         });
+        
         const asteroid = new THREE.Mesh(asteroidGeometry, asteroidMaterial);
-        asteroid.position.set(4.2, 0.5, 0); // موقعه بجانب الكرة
+        asteroid.position.set(2.8, 0, 0); // موقعه بجانب الكوكب الرئيسي
         scene.add(asteroid);
 
-        // --- 4. نص "Ali" المضيء فوق الكويكب الصغير ---
+        // --- 4. نص "Ali" المضيء والمستقر فوق الكويكب ---
         const aliCanvas = document.createElement('canvas');
         aliCanvas.width = 512;
         aliCanvas.height = 256;
         const aliContext = aliCanvas.getContext('2d');
 
-        aliContext.shadowColor = '#ff007f';
-        aliContext.shadowBlur = 20;
-        aliContext.font = 'Bold 110px Arial, sans-serif';
+        aliContext.shadowColor = '#00f0ff';
+        aliContext.shadowBlur = 30;
+        aliContext.font = 'Bold 130px Arial, sans-serif';
         aliContext.fillStyle = '#ffffff';
         aliContext.textAlign = 'center';
         aliContext.textBaseline = 'middle';
@@ -128,9 +144,9 @@
             side: THREE.DoubleSide
         });
 
-        const aliGeometry = new THREE.PlaneGeometry(2.4, 1.2);
+        const aliGeometry = new THREE.PlaneGeometry(2.2, 1.1);
         const aliMesh = new THREE.Mesh(aliGeometry, aliMaterial);
-        aliMesh.position.set(4.2, 1.7, 0); // فوق الكويكب الصغير
+        aliMesh.position.set(2.8, 1.4, 0);
         scene.add(aliMesh);
 
         // --- خلفية طبيعية فضائية ---
@@ -207,19 +223,18 @@
 
             const elapsedTime = clock.getElapsedTime();
 
-            // دوران وتفاعل الكرة الرئيسية والنص
+            // دوران الكوكب الرئيسي
             innerSphere.rotation.y += 0.0025;
             innerSphere.rotation.x += 0.0008;
 
-            textMesh.position.y = 3.5 + Math.sin(elapsedTime * 2) * 0.1;
-            textMesh.rotation.y += 0.0025;
+            textMesh.position.y = 3.3 + Math.sin(elapsedTime * 2) * 0.1;
 
-            // حركة ودوران الكويكب الصغير "Ali"
-            asteroid.rotation.y += 0.01;
-            asteroid.position.y = 0.5 + Math.sin(elapsedTime * 1.5) * 0.15;
+            // دوران وحركة كويكب Ali المضيء
+            asteroid.rotation.y += 0.008;
+            asteroid.rotation.x += 0.003;
+            asteroid.position.y = Math.sin(elapsedTime * 1.5) * 0.15;
             
-            aliMesh.position.y = 1.7 + Math.sin(elapsedTime * 1.5) * 0.15;
-            aliMesh.rotation.y += 0.005;
+            aliMesh.position.y = 1.4 + Math.sin(elapsedTime * 1.5) * 0.15;
 
             outerSpaceSphere.rotation.y -= 0.0003;
             starField.rotation.y += 0.0005;
@@ -238,3 +253,4 @@
     </script>
 </body>
 </html>
+
