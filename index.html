@@ -24,7 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div class="info">✨ فن يحچي • اسحب للتدوير</div>
+    <div class="info">✨ فن يحچي • اسحب للتدوير • المس نجمة لتفجيرها بالألوان ✨</div>
 <script>
     (function() {
         // --- المشهد، الكاميرا، المُعَرِّض ---
@@ -38,6 +38,7 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.style.touchAction = 'none'; // مهم لالتقاط اللمس بدقة مع OrbitControls
         document.body.appendChild(renderer.domElement);
 
         // التحكم بالكاميرا
@@ -49,6 +50,14 @@
         controls.target.set(0, 0, 0);
         controls.rotateSpeed = 0.7;
         controls.zoomSpeed = 1.0;
+
+        // --- ساعة داخلية لحساب الزمن الحقيقي (تُستخدم في الانفجارات وتلوين Ali) ---
+        const clock = new THREE.Clock();
+        const raycaster = new THREE.Raycaster();
+        const pointerNDC = new THREE.Vector2();
+        const explosions = [];
+        const shockwaves = [];
+        const FLASH_DURATION = 0.45;
 
         // --- إضاءة ---
         const ambientLight = new THREE.AmbientLight(0x404060);
@@ -119,13 +128,42 @@
         const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
         scene.add(nebula);
 
-        // --- 3. الكويكب Ali ---
+        // --- 3. الكويكب Ali (متعدد الألوان ومتغيّر باستمرار) ---
         const aliGeo = new THREE.SphereGeometry(0.8, 48, 48);
+
+        // نسيج قوس قزح إجرائي (Procedural) بدل اللون الواحد
+        const aliCanvas = document.createElement('canvas');
+        aliCanvas.width = 256; aliCanvas.height = 256;
+        const aliCtx = aliCanvas.getContext('2d');
+        const aliGrad = aliCtx.createLinearGradient(0, 0, 256, 256);
+        aliGrad.addColorStop(0.00, '#ff0080');
+        aliGrad.addColorStop(0.18, '#ff8c00');
+        aliGrad.addColorStop(0.36, '#ffee00');
+        aliGrad.addColorStop(0.54, '#00ff88');
+        aliGrad.addColorStop(0.72, '#00baff');
+        aliGrad.addColorStop(0.90, '#a000ff');
+        aliGrad.addColorStop(1.00, '#ff0080');
+        aliCtx.fillStyle = aliGrad;
+        aliCtx.fillRect(0, 0, 256, 256);
+        // بقع صغيرة لإعطاء ملمس معدني/كريستالي معقد
+        for (let i = 0; i < 220; i++) {
+            aliCtx.fillStyle = `hsla(${Math.random() * 360}, 100%, 65%, ${Math.random() * 0.35})`;
+            aliCtx.beginPath();
+            aliCtx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 18 + 2, 0, Math.PI * 2);
+            aliCtx.fill();
+        }
+        const aliTexture = new THREE.CanvasTexture(aliCanvas);
+        aliTexture.wrapS = THREE.RepeatWrapping;
+        aliTexture.wrapT = THREE.RepeatWrapping;
+
         const aliMat = new THREE.MeshStandardMaterial({
-            color: 0x00ffff,
-            emissive: new THREE.Color(0x004466),
-            roughness: 0.2,
-            metalness: 0.7
+            map: aliTexture,
+            color: 0xffffff,
+            emissive: new THREE.Color(0xffffff),
+            emissiveMap: aliTexture,
+            emissiveIntensity: 0.5,
+            roughness: 0.25,
+            metalness: 0.6
         });
         const ali = new THREE.Mesh(aliGeo, aliMat);
         ali.position.set(2.8, 0, 0);
@@ -248,13 +286,13 @@
         const tinyStars = new THREE.Points(tinyGeo, tinyMat);
         scene.add(tinyStars);
 
-        // --- 7. النجوم المخصصة بالأسماء (بيضاء اللون وتدور) ---
+        // --- 7. النجوم المخصصة بالأسماء (بيضاء اللون، تدور، وقابلة للمس) ---
         const names = [
             "رَوَاحة الكُبْرى",
             "جَواهِر",
             "ابو ذيبة",
             "المسيحي",
-            "ضُّحَى",
+            "ضُّحَى",
             "إِسْكَنْدَر",
             "Dha",
             "جورج وسوف"
@@ -310,6 +348,14 @@
             glowMesh.position.copy(starMesh.position);
             scene.add(glowMesh);
 
+            // هدف لمس خفي أكبر من النجمة نفسها (لتسهيل اللمس على الجوال)
+            const hitGeo = new THREE.SphereGeometry(0.55, 8, 8);
+            const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+            const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+            hitMesh.position.copy(starMesh.position);
+            hitMesh.userData.starIndex = index;
+            scene.add(hitMesh);
+
             // اسم الشخص
             const canvas = document.createElement('canvas');
             canvas.width = 512;
@@ -356,67 +402,91 @@
             namedStars.push({
                 star: starMesh,
                 glow: glowMesh,
+                hitMesh: hitMesh,
                 label: sprite,
                 basePos: new THREE.Vector3(finalPos.x, finalPos.y, finalPos.z),
                 phase: Math.random() * Math.PI * 2,
-                rotSpeed: 0.02 + Math.random() * 0.03
+                rotSpeed: 0.02 + Math.random() * 0.03,
+                flashUntil: 0
             });
         });
 
-        // --- 8. التحريك الرئيسي ---
-        function animate() {
-            requestAnimationFrame(animate);
+        const starHitMeshes = namedStars.map((item) => item.hitMesh);
 
-            // دوران الكوكب والكويكب
-            earth.rotation.y += 0.004;
-            earth.rotation.x += 0.001;
-            ali.rotation.y += 0.008;
-            ali.rotation.z += 0.003;
+        // --- 8. نظام الانفجارات الملونة عند لمس النجوم ---
+        function createExplosion(position) {
+            const count = 110;
+            const geo = new THREE.BufferGeometry();
+            const posArr = new Float32Array(count * 3);
+            const velArr = new Float32Array(count * 3);
+            const colArr = new Float32Array(count * 3);
 
-            // دوران السديم
-            nebula.rotation.y += 0.0003;
-            nebula.rotation.x += 0.0001;
+            for (let i = 0; i < count; i++) {
+                posArr[i*3] = position.x;
+                posArr[i*3+1] = position.y;
+                posArr[i*3+2] = position.z;
 
-            // دوران النجوم الخلفية
-            stars.rotation.y += 0.00008;
-            stars.rotation.x += 0.00002;
-            tinyStars.rotation.y -= 0.00005;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                const speed = 1.8 + Math.random() * 3.0;
+                velArr[i*3]   = Math.sin(phi) * Math.cos(theta) * speed;
+                velArr[i*3+1] = Math.sin(phi) * Math.sin(theta) * speed;
+                velArr[i*3+2] = Math.cos(phi) * speed;
 
-            // تحريك النجوم المخصصة
-            const time = Date.now() * 0.001;
-            namedStars.forEach((item) => {
-                // دوران النجمة حول نفسها
-                item.star.rotation.x += item.rotSpeed;
-                item.star.rotation.y += item.rotSpeed * 1.3;
-                item.star.rotation.z += item.rotSpeed * 0.7;
-                
-                // اهتزاز بسيط
-                const offset = Math.sin(time * 1.2 + item.phase) * 0.03;
-                item.star.position.y = item.basePos.y + offset;
-                item.glow.position.y = item.basePos.y + offset;
-                item.label.position.y = item.basePos.y + 0.7 + offset * 0.5;
-                
-                // تغير في شفافية الهالة
-                const pulse = Math.sin(time * 1.8 + item.phase) * 0.05 + 0.15;
-                item.glow.material.opacity = pulse;
+                const hue = Math.random();
+                const c = new THREE.Color();
+                c.setHSL(hue, 1.0, 0.55 + Math.random() * 0.2);
+                colArr[i*3] = c.r;
+                colArr[i*3+1] = c.g;
+                colArr[i*3+2] = c.b;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+
+            const mat = new THREE.PointsMaterial({
+                size: 0.22,
+                map: starTexture,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                depthWrite: false,
+                opacity: 1.0,
+                sizeAttenuation: true
             });
 
-            controls.update();
-            renderer.render(scene, camera);
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
+            explosions.push({ points, velocities: velArr, life: 0, maxLife: 1.5 });
+
+            // موجة صدمة حلقية متوهجة
+            const ringGeo = new THREE.RingGeometry(0.05, 0.16, 40);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.85,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.copy(position);
+            ring.lookAt(camera.position);
+            scene.add(ring);
+            shockwaves.push({ mesh: ring, life: 0, maxLife: 0.75 });
         }
 
-        animate();
-
-        // --- التكيف مع تغير حجم النافذة ---
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        console.log('✨ فن يحچي 3D - نجوم بيضاء تدور!');
-    })();
-</script>
-</body>
-</html>
+        function updateExplosions(delta) {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const ex = explosions[i];
+                ex.life += delta;
+                const t = ex.life / ex.maxLife;
+                if (t >= 1) {
+                    scene.remove(ex.points);
+                    ex.points.geometry.dispose();
+                    ex.points.material.dispose();
+                    explosions.splice(i, 1);
+                    continue;
+                }
+                const posAttr = ex.points.geometry.attributes.position;
+     
