@@ -47,15 +47,12 @@
         // --- إنشاء مجسم الكرة المركزية ---
         const innerSphereGeometry = new THREE.SphereGeometry(2.3, 64, 64);
         
-        // خامة تعتمد على الإضاءة المباشرة
         const innerSphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const innerSphere = new THREE.Mesh(innerSphereGeometry, innerSphereMaterial);
         scene.add(innerSphere);
 
         // --- تحميل الصورة بمسار نسبي حاسم ---
         const loader = new THREE.TextureLoader();
-        
-        // المحاولة بجميع المسارات الممكنة للصورة لضمان التحميل على السيرفر
         const imgPath = './myimage.jpg';
         
         loader.load(
@@ -66,13 +63,39 @@
             },
             undefined,
             function (err) {
-                // تجربة امتداد JPG بحروف كبيرة في حال فشل المسار الأول
                 loader.load('./myimage.JPG', function (altTexture) {
                     innerSphereMaterial.map = altTexture;
                     innerSphereMaterial.needsUpdate = true;
                 });
             }
         );
+
+        // --- إضافة نص "فن يحچي" ثلاثي الأبعاد مضيء فوق الكرة ---
+        const textCanvas = document.createElement('canvas');
+        textCanvas.width = 1024;
+        textCanvas.height = 256;
+        const textContext = textCanvas.getContext('2d');
+
+        // إضافة توهج وضبابية نيونية حول النص
+        textContext.shadowColor = '#00f0ff';
+        textContext.shadowBlur = 25;
+        textContext.font = 'Bold 95px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+        textContext.fillStyle = '#ffffff';
+        textContext.textAlign = 'center';
+        textContext.textBaseline = 'middle';
+        textContext.fillText('فن يحچي', textCanvas.width / 2, textCanvas.height / 2);
+
+        const textTexture = new THREE.CanvasTexture(textCanvas);
+        const textMaterial = new THREE.MeshBasicMaterial({
+            map: textTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        const textGeometry = new THREE.PlaneGeometry(5.2, 1.3);
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+        textMesh.position.set(0, 3.5, 0); // موضع النص فوق الكرة تماماً
+        scene.add(textMesh);
 
         // --- خلفية طبيعية فضائية ---
         const spaceGeometry = new THREE.SphereGeometry(25, 64, 64);
@@ -141,11 +164,20 @@
         scene.add(starField);
 
         // --- حلقة الحركة ---
+        let clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
 
+            const elapsedTime = clock.getElapsedTime();
+
+            // دوران الكرة
             innerSphere.rotation.y += 0.0025;
             innerSphere.rotation.x += 0.0008;
+
+            // تحريك النص بشكل طفو خفيف ودوران متناسق
+            textMesh.position.y = 3.5 + Math.sin(elapsedTime * 2) * 0.1;
+            textMesh.rotation.y += 0.0025;
 
             outerSpaceSphere.rotation.y -= 0.0003;
             starField.rotation.y += 0.0005;
