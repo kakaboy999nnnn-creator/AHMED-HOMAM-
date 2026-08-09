@@ -29,7 +29,54 @@
     (function() {
         // --- المشهد، الكاميرا، المُعَرِّض ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050510);
+        // خلفية سوداء متموجة (تدرجات سوداء مع لمسات زرقاء داكنة جداً)
+        scene.background = new THREE.Color(0x000000);
+
+        // نضيف تأثير تموج للخلفية باستخدام Canvas Texture
+        const bgCanvas = document.createElement('canvas');
+        bgCanvas.width = 1024;
+        bgCanvas.height = 1024;
+        const bgCtx = bgCanvas.getContext('2d');
+        
+        // تعبئة سوداء مع تموجات خفيفة جداً
+        const gradient = bgCtx.createRadialGradient(512, 512, 0, 512, 512, 512);
+        gradient.addColorStop(0, '#000000');
+        gradient.addColorStop(0.3, '#0a0a0f');
+        gradient.addColorStop(0.6, '#000000');
+        gradient.addColorStop(0.8, '#0a0a12');
+        gradient.addColorStop(1, '#000000');
+        bgCtx.fillStyle = gradient;
+        bgCtx.fillRect(0, 0, 1024, 1024);
+        
+        // تموجات خفيفة جداً (خطوط منحنية)
+        for (let i = 0; i < 30; i++) {
+            bgCtx.strokeStyle = `rgba(20, 20, 40, ${Math.random() * 0.15})`;
+            bgCtx.lineWidth = 1 + Math.random() * 3;
+            bgCtx.beginPath();
+            const startX = Math.random() * 1024;
+            const startY = Math.random() * 1024;
+            bgCtx.moveTo(startX, startY);
+            for (let j = 0; j < 10; j++) {
+                bgCtx.quadraticCurveTo(
+                    startX + (Math.random() - 0.5) * 200,
+                    startY + (Math.random() - 0.5) * 200,
+                    Math.random() * 1024,
+                    Math.random() * 1024
+                );
+            }
+            bgCtx.stroke();
+        }
+        
+        const bgTexture = new THREE.CanvasTexture(bgCanvas);
+        const bgMaterial = new THREE.MeshBasicMaterial({
+            map: bgTexture,
+            side: THREE.BackSide,
+            transparent: true,
+            opacity: 0.3
+        });
+        const bgPlane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), bgMaterial);
+        bgPlane.position.z = -50;
+        scene.add(bgPlane);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 1.5, 9);
@@ -50,7 +97,7 @@
         controls.rotateSpeed = 0.7;
         controls.zoomSpeed = 1.0;
 
-        // ساعة داخلية لحساب الزمن الحقيقي (تُستخدم لتلوين Ali المتغيّر)
+        // ساعة داخلية لحساب الزمن الحقيقي
         const clock = new THREE.Clock();
 
         // --- إضاءة ---
@@ -99,16 +146,16 @@
         ctx.fillStyle = '#000000'; 
         ctx.fillRect(0, 0, 512, 512);
         for (let i = 0; i < 120; i++) {
-            const r = 30 + Math.random() * 120;
-            const g = 10 + Math.random() * 60;
-            const b = 150 + Math.random() * 105;
-            ctx.fillStyle = `rgba(${r|0}, ${g|0}, ${b|0}, ${Math.random() * 0.35 + 0.1})`;
+            const r = 10 + Math.random() * 50;
+            const g = 10 + Math.random() * 30;
+            const b = 30 + Math.random() * 60;
+            ctx.fillStyle = `rgba(${r|0}, ${g|0}, ${b|0}, ${Math.random() * 0.25 + 0.05})`;
             ctx.beginPath();
             ctx.arc(Math.random() * 512, Math.random() * 512, Math.random() * 180 + 20, 0, Math.PI * 2);
             ctx.fill();
         }
-        for (let i = 0; i < 30; i++) {
-            ctx.fillStyle = `rgba(200, 180, 255, ${Math.random() * 0.2})`;
+        for (let i = 0; i < 20; i++) {
+            ctx.fillStyle = `rgba(40, 30, 80, ${Math.random() * 0.1})`;
             ctx.beginPath();
             ctx.arc(Math.random() * 512, Math.random() * 512, Math.random() * 60 + 10, 0, Math.PI * 2);
             ctx.fill();
@@ -117,7 +164,7 @@
             map: new THREE.CanvasTexture(nebulaCanvas),
             side: THREE.BackSide,
             transparent: true,
-            opacity: 0.55
+            opacity: 0.35
         });
         const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
         scene.add(nebula);
@@ -125,7 +172,6 @@
         // --- 3. الكويكب Ali (متعدد الألوان ومتغيّر باستمرار) ---
         const aliGeo = new THREE.SphereGeometry(0.8, 48, 48);
 
-        // نسيج قوس قزح إجرائي (Procedural) بدل اللون الواحد
         const aliCanvas = document.createElement('canvas');
         aliCanvas.width = 256; aliCanvas.height = 256;
         const aliCtx = aliCanvas.getContext('2d');
@@ -139,7 +185,6 @@
         aliGrad.addColorStop(1.00, '#ff0080');
         aliCtx.fillStyle = aliGrad;
         aliCtx.fillRect(0, 0, 256, 256);
-        // بقع صغيرة لإعطاء ملمس معدني/كريستالي معقد
         for (let i = 0; i < 220; i++) {
             aliCtx.fillStyle = `hsla(${Math.random() * 360}, 100%, 65%, ${Math.random() * 0.35})`;
             aliCtx.beginPath();
@@ -210,22 +255,11 @@
             positions[i*3+1] = Math.sin(phi) * Math.sin(theta) * r;
             positions[i*3+2] = Math.cos(phi) * r;
 
-            const colorVal = 0.7 + Math.random() * 0.5;
-            const tint = Math.random();
-            if (tint < 0.6) {
-                colors[i*3] = colorVal;
-                colors[i*3+1] = colorVal * (0.8 + Math.random() * 0.2);
-                colors[i*3+2] = 1.0;
-            } else if (tint < 0.85) {
-                colors[i*3] = 1.0;
-                colors[i*3+1] = 0.7 + Math.random() * 0.3;
-                colors[i*3+2] = 0.3 + Math.random() * 0.2;
-            } else {
-                colors[i*3] = 0.9 + Math.random() * 0.3;
-                colors[i*3+1] = 0.3 + Math.random() * 0.3;
-                colors[i*3+2] = 0.9 + Math.random() * 0.3;
-            }
-            sizes[i] = 0.05 + Math.random() * 0.25;
+            const colorVal = 0.5 + Math.random() * 0.3;
+            colors[i*3] = colorVal;
+            colors[i*3+1] = colorVal * (0.8 + Math.random() * 0.2);
+            colors[i*3+2] = colorVal * (0.9 + Math.random() * 0.1);
+            sizes[i] = 0.04 + Math.random() * 0.2;
         }
         starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -237,20 +271,20 @@
         const gradient = sCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
         gradient.addColorStop(0, 'rgba(255,255,255,1)');
         gradient.addColorStop(0.3, 'rgba(255,255,255,0.9)');
-        gradient.addColorStop(0.7, 'rgba(180,180,255,0.6)');
+        gradient.addColorStop(0.7, 'rgba(200,200,255,0.5)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
         sCtx.fillStyle = gradient;
         sCtx.fillRect(0, 0, 32, 32);
         const starTexture = new THREE.CanvasTexture(starCanvas);
 
         const starsMaterial = new THREE.PointsMaterial({
-            size: 0.2,
+            size: 0.15,
             map: starTexture,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             transparent: true,
             vertexColors: true,
-            opacity: 0.95,
+            opacity: 0.7,
             sizeAttenuation: true
         });
         const stars = new THREE.Points(starsGeometry, starsMaterial);
@@ -270,8 +304,8 @@
         }
         tinyGeo.setAttribute('position', new THREE.BufferAttribute(tinyPos, 3));
         const tinyMat = new THREE.PointsMaterial({
-            color: 0x88aaff,
-            size: 0.08,
+            color: 0x446688,
+            size: 0.06,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
@@ -280,7 +314,7 @@
         const tinyStars = new THREE.Points(tinyGeo, tinyMat);
         scene.add(tinyStars);
 
-        // --- 7. النجوم المخصصة بالأسماء (بيضاء اللون وتدور حول نفسها) ---
+        // --- 7. النجوم المخصصة بالأسماء (تتحرك حول الدائرة) ---
         const names = [
             "رَوَاحة الكُبْرى",
             "جَواهِر",
@@ -289,9 +323,16 @@
             "ضُّحَى",
             "إِسْكَنْدَر",
             "Dha",
-            "جورج وسوف"
+            "جورج وسوف",
+            "Nyar",
+            "توجان",
+            "لَوْذَع",
+            "بنين",
+            "لوزه",
+            "Cherry"
         ];
 
+        // توزيع النجوم في الفضاء (14 موقع مختلف)
         const starPositions = [
             { x: -2.5, y: 1.8, z: 2.5 },
             { x: 1.2, y: 2.5, z: 2.0 },
@@ -300,16 +341,22 @@
             { x: 0.5, y: -2.8, z: 2.0 },
             { x: -1.8, y: 2.8, z: 1.5 },
             { x: 2.8, y: 1.0, z: 2.8 },
-            { x: -3.8, y: -0.5, z: 2.0 }
+            { x: -3.8, y: -0.5, z: 2.0 },
+            { x: -1.2, y: -2.2, z: 2.8 },
+            { x: 3.0, y: 2.2, z: 1.2 },
+            { x: -2.8, y: -1.8, z: 2.5 },
+            { x: 1.8, y: -1.0, z: 3.0 },
+            { x: -0.5, y: 2.2, z: 3.2 },
+            { x: 4.0, y: 0.5, z: 1.5 }
         ];
 
         const namedStars = [];
 
         names.forEach((name, index) => {
             const pos = starPositions[index % starPositions.length];
-            const offsetX = (Math.random() - 0.5) * 0.4;
-            const offsetY = (Math.random() - 0.5) * 0.4;
-            const offsetZ = (Math.random() - 0.5) * 0.4;
+            const offsetX = (Math.random() - 0.5) * 0.3;
+            const offsetY = (Math.random() - 0.5) * 0.3;
+            const offsetZ = (Math.random() - 0.5) * 0.3;
             const finalPos = {
                 x: pos.x + offsetX,
                 y: pos.y + offsetY,
@@ -385,27 +432,38 @@
             sprite.scale.set(1.6, 0.4, 1);
             scene.add(sprite);
 
+            // تخزين البيانات مع زاوية دوران لكل نجمة
+            const angle = (index / names.length) * Math.PI * 2;
+            const orbitRadius = 2.5 + Math.random() * 1.0;
+            
             namedStars.push({
                 star: starMesh,
                 glow: glowMesh,
                 label: sprite,
                 basePos: new THREE.Vector3(finalPos.x, finalPos.y, finalPos.z),
                 phase: Math.random() * Math.PI * 2,
-                rotSpeed: 0.02 + Math.random() * 0.03
+                rotSpeed: 0.02 + Math.random() * 0.03,
+                angle: angle,
+                orbitRadius: orbitRadius,
+                centerOffset: new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.5,
+                    (Math.random() - 0.5) * 1.5,
+                    (Math.random() - 0.5) * 1.5
+                )
             });
         });
 
         // --- 8. التحريك الرئيسي ---
         function animate() {
             requestAnimationFrame(animate);
-            const delta = Math.min(clock.getDelta(), 0.1); // حماية من قفزات كبيرة عند تبديل التبويب
+            const delta = Math.min(clock.getDelta(), 0.1);
             const elapsed = clock.elapsedTime;
 
             // دوران الكوكب
             earth.rotation.y += 0.004;
             earth.rotation.x += 0.001;
 
-            // دوران وتلوين الكويكب Ali (يدور حول نفسه وتتغيّر ألوانه باستمرار)
+            // دوران وتلوين الكويكب Ali
             ali.rotation.y += delta * 1.7;
             ali.rotation.x += delta * 0.9;
             ali.rotation.z += delta * 0.55;
@@ -414,49 +472,27 @@
             aliMat.emissiveIntensity = 0.45 + Math.sin(elapsed * 2.2) * 0.25;
 
             // دوران السديم
-            nebula.rotation.y += 0.0003;
+            nebula.rotation.y += 0.0002;
             nebula.rotation.x += 0.0001;
 
             // دوران النجوم الخلفية
-            stars.rotation.y += 0.00008;
-            stars.rotation.x += 0.00002;
-            tinyStars.rotation.y -= 0.00005;
+            stars.rotation.y += 0.00006;
+            stars.rotation.x += 0.00001;
+            tinyStars.rotation.y -= 0.00004;
 
-            // تحريك النجوم المخصصة (تدور حول نفسها وتنبض بهدوء)
+            // تحريك النجوم المخصصة (تدور حول مركزها وتتحرك في مدار دائري)
             const time = Date.now() * 0.001;
-            namedStars.forEach((item) => {
+            namedStars.forEach((item, index) => {
                 // دوران النجمة حول نفسها
                 item.star.rotation.x += item.rotSpeed;
                 item.star.rotation.y += item.rotSpeed * 1.3;
                 item.star.rotation.z += item.rotSpeed * 0.7;
                 
-                // اهتزاز بسيط
-                const offset = Math.sin(time * 1.2 + item.phase) * 0.03;
-                item.star.position.y = item.basePos.y + offset;
-                item.glow.position.y = item.basePos.y + offset;
-                item.label.position.y = item.basePos.y + 0.7 + offset * 0.5;
+                // حركة مدارية دائرية حول نقطة مركزية
+                const orbitSpeed = 0.3 + (index * 0.05);
+                const angleOffset = time * orbitSpeed + item.phase;
                 
-                // تغير في شفافية الهالة
-                const pulse = Math.sin(time * 1.8 + item.phase) * 0.05 + 0.15;
-                item.glow.material.opacity = pulse;
-            });
-
-            controls.update();
-            renderer.render(scene, camera);
-        }
-
-        animate();
-
-        // --- التكيف مع تغير حجم النافذة ---
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        console.log('✨ فن يحچي 3D - نجوم بيضاء تدور، وكويكب Ali متعدد الألوان!');
-    })();
-</script>
-</body>
-</html>
+                // موقع مدار الدوران (حول مركز الكوكب تقريباً)
+                const centerX = -0.5 + Math.sin(index * 1.7) * 0.5;
+                const centerY = 0.2 + Math.cos(index * 2.3) * 0.5;
+      
