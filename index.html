@@ -32,8 +32,8 @@
         controls.rotateSpeed = 0.6;
         controls.enableZoom = true;
 
-        // --- إضاءة ملونة وزاهية ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        // --- إضاءة متكاملة ومباشرة ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
         scene.add(ambientLight);
 
         const light1 = new THREE.PointLight(0x00f0ff, 2, 50);
@@ -44,42 +44,35 @@
         light2.position.set(-10, -10, -10);
         scene.add(light2);
 
-        const light3 = new THREE.PointLight(0x9d4edd, 1.5, 40);
-        light3.position.set(0, 15, 0);
-        scene.add(light3);
-
-        // --- تحميل الصورة بآلية مضمونة 100% ---
-        const textureLoader = new THREE.TextureLoader();
-        
-        // رابط الصورة المباشر من مستودعك
-        const rawImageUrl = "https://raw.githubusercontent.com/kakaboy999nnnn-creator/AHMED-HOMAM-/main/myimage.jpg";
-
+        // --- إنشاء مجسم الكرة المركزية ---
         const innerSphereGeometry = new THREE.SphereGeometry(2.3, 64, 64);
-        const innerSphereMaterial = new THREE.MeshStandardMaterial({
-            metalness: 0.1,
-            roughness: 0.2,
-        });
+        
+        // خامة تعتمد على الإضاءة المباشرة
+        const innerSphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const innerSphere = new THREE.Mesh(innerSphereGeometry, innerSphereMaterial);
+        scene.add(innerSphere);
 
-        // جلب الصورة وتطبيقها على الكرة مع معالجة الأخطاء
-        textureLoader.load(
-            rawImageUrl,
+        // --- تحميل الصورة بمسار نسبي حاسم ---
+        const loader = new THREE.TextureLoader();
+        
+        // المحاولة بجميع المسارات الممكنة للصورة لضمان التحميل على السيرفر
+        const imgPath = './myimage.jpg';
+        
+        loader.load(
+            imgPath,
             function (texture) {
                 innerSphereMaterial.map = texture;
                 innerSphereMaterial.needsUpdate = true;
             },
             undefined,
             function (err) {
-                // في حال كانت الصيغة مرفوعة بـ JPG كبيرة
-                const fallbackUrl = "https://raw.githubusercontent.com/kakaboy999nnnn-creator/AHMED-HOMAM-/main/myimage.JPG";
-                textureLoader.load(fallbackUrl, function (altTexture) {
+                // تجربة امتداد JPG بحروف كبيرة في حال فشل المسار الأول
+                loader.load('./myimage.JPG', function (altTexture) {
                     innerSphereMaterial.map = altTexture;
                     innerSphereMaterial.needsUpdate = true;
                 });
             }
         );
-
-        const innerSphere = new THREE.Mesh(innerSphereGeometry, innerSphereMaterial);
-        scene.add(innerSphere);
 
         // --- خلفية طبيعية فضائية ---
         const spaceGeometry = new THREE.SphereGeometry(25, 64, 64);
