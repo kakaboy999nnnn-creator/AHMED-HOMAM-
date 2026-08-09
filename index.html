@@ -18,7 +18,7 @@
         // --- الأساسيات ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 7); // ضبط الكاميرا في المنتصف تماماً
+        camera.position.set(0, 0, 7);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -33,62 +33,68 @@
         controls.enableZoom = true;
 
         // --- إضاءة ملونة وزاهية ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
         scene.add(ambientLight);
 
-        // أضواء فنية بـ ألوان زاهية (بنفسجي، أزرق سمائي، وردي)
-        const light1 = new THREE.PointLight(0x00f0ff, 2, 50); // ضوء أزرق سماوي زاهي
+        const light1 = new THREE.PointLight(0x00f0ff, 2, 50);
         light1.position.set(10, 10, 10);
         scene.add(light1);
 
-        const light2 = new THREE.PointLight(0xff007f, 2, 50); // ضوء وردي/أرجواني زاهي
+        const light2 = new THREE.PointLight(0xff007f, 2, 50);
         light2.position.set(-10, -10, -10);
         scene.add(light2);
 
-        const light3 = new THREE.PointLight(0x9d4edd, 1.5, 40); // ضوء بنفسجي فني
+        const light3 = new THREE.PointLight(0x9d4edd, 1.5, 40);
         light3.position.set(0, 15, 0);
         scene.add(light3);
 
+        // --- تحميل الصورة بآلية مضمونة 100% ---
         const textureLoader = new THREE.TextureLoader();
-
-        // 1. الكرة المركزية (صورة الأيدي)
-        const handsImageUrl = "https://lh3.googleusercontent.com/pw/AJFCJaVp3-zWkE9P0QnJ4D07P4n_m2O1F6rA28C7h5y7jQ=w640"; 
-        const handsTexture = textureLoader.load(handsImageUrl);
+        
+        // رابط الصورة المباشر من مستودعك
+        const rawImageUrl = "https://raw.githubusercontent.com/kakaboy999nnnn-creator/AHMED-HOMAM-/main/myimage.jpg";
 
         const innerSphereGeometry = new THREE.SphereGeometry(2.3, 64, 64);
         const innerSphereMaterial = new THREE.MeshStandardMaterial({
-            map: handsTexture,
             metalness: 0.1,
             roughness: 0.2,
         });
+
+        // جلب الصورة وتطبيقها على الكرة مع معالجة الأخطاء
+        textureLoader.load(
+            rawImageUrl,
+            function (texture) {
+                innerSphereMaterial.map = texture;
+                innerSphereMaterial.needsUpdate = true;
+            },
+            undefined,
+            function (err) {
+                // في حال كانت الصيغة مرفوعة بـ JPG كبيرة
+                const fallbackUrl = "https://raw.githubusercontent.com/kakaboy999nnnn-creator/AHMED-HOMAM-/main/myimage.JPG";
+                textureLoader.load(fallbackUrl, function (altTexture) {
+                    innerSphereMaterial.map = altTexture;
+                    innerSphereMaterial.needsUpdate = true;
+                });
+            }
+        );
+
         const innerSphere = new THREE.Mesh(innerSphereGeometry, innerSphereMaterial);
         scene.add(innerSphere);
 
-        // 2. خلفية طبيعية فضائية بألوان خلابة وزاهية (Cosmic / Nebula Art)
+        // --- خلفية طبيعية فضائية ---
         const spaceGeometry = new THREE.SphereGeometry(25, 64, 64);
         
-        // استخدام صورة مجرة وسديم ألوانها خلابة وزاهية
-        const spaceTexture = textureLoader.load('https://threejs.org/examples/textures/planets/earth_atm.jpg'); 
-        
-        const spaceMaterial = new THREE.MeshBasicMaterial({
-            color: 0x9d4edd, // إضافة لون بنفسجي غني زاهي
-            wireframe: false,
-            side: THREE.BackSide
-        });
-
-        // إنشاء خلفية ألوان متدرجة فنية متوهجة بدلاً من البيوت
         const canvas = document.createElement('canvas');
         canvas.width = 1024;
         canvas.height = 512;
         const context = canvas.getContext('2d');
         
-        // التدرج الملون الخلاب (وردي، بنفسجي، أزرق داكن، وأرجواني)
         const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, '#240046');   // بنفسجي عميق
-        gradient.addColorStop(0.3, '#7209b7'); // أرجواني زاهي
-        gradient.addColorStop(0.6, '#f72585'); // وردي فني زاهي
-        gradient.addColorStop(0.8, '#4cc9f0'); // أزرق خلاب
-        gradient.addColorStop(1, '#10002b');   // ليل فضائي
+        gradient.addColorStop(0, '#240046');   
+        gradient.addColorStop(0.3, '#7209b7'); 
+        gradient.addColorStop(0.6, '#f72585'); 
+        gradient.addColorStop(0.8, '#4cc9f0'); 
+        gradient.addColorStop(1, '#10002b');   
 
         context.fillStyle = gradient;
         context.fillRect(0, 0, canvas.width, canvas.height);
@@ -102,18 +108,18 @@
         const outerSpaceSphere = new THREE.Mesh(spaceGeometry, artBackgroundMaterial);
         scene.add(outerSpaceSphere);
 
-        // 3. إضافة جزيئات ملونة ونجوم براقة متوهجة
+        // --- جزيئات ملونة ونجوم ---
         const particlesCount = 3000;
         const particlesGeometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particlesCount * 3);
         const colors = new Float32Array(particlesCount * 3);
 
         const colorOptions = [
-            new THREE.Color(0xff70a6), // وردي
-            new THREE.Color(0xff9770), // برتقالي داكن ناعم
-            new THREE.Color(0xffd670), // ذهبي
-            new THREE.Color(0xe9ff70), // أصفر براق
-            new THREE.Color(0x70d6ff)  // أزرق زاهي
+            new THREE.Color(0xff70a6),
+            new THREE.Color(0xff9770),
+            new THREE.Color(0xffd670),
+            new THREE.Color(0xe9ff70),
+            new THREE.Color(0x70d6ff)
         ];
 
         for (let i = 0; i < particlesCount; i++) {
@@ -141,18 +147,14 @@
         const starField = new THREE.Points(particlesGeometry, particlesMaterial);
         scene.add(starField);
 
-        // --- حلقة الحركة (Animation) ---
+        // --- حلقة الحركة ---
         function animate() {
             requestAnimationFrame(animate);
 
-            // دوران بطيء وانسيابي للكرة الرئيسية (الأيدي)
             innerSphere.rotation.y += 0.0025;
             innerSphere.rotation.x += 0.0008;
 
-            // دوران هادئ لخلفية الفضاء الملونة
             outerSpaceSphere.rotation.y -= 0.0003;
-
-            // دوران بطيء جداً للجزيئات المضيئة
             starField.rotation.y += 0.0005;
 
             controls.update();
@@ -161,7 +163,6 @@
 
         animate();
 
-        // تجاوب مع تغيير حجم الشاشة
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -170,4 +171,3 @@
     </script>
 </body>
 </html>
-
