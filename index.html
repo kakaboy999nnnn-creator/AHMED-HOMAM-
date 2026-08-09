@@ -18,15 +18,29 @@
             letter-spacing: 1px;
             z-index: 10;
         }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            z-index: 20;
+            font-family: Arial, sans-serif;
+        }
     </style>
     <!-- Three.js r128 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
+    <div class="loading">جاري التحميل...</div>
     <div class="info">✨ اضغط على أي نجمة لترى المتفجرات الملونة</div>
 <script>
     (function() {
+        // --- إخفاء رسالة التحميل ---
+        document.querySelector('.loading').style.display = 'none';
+
         // --- المشهد، الكاميرا، المُعَرِّض ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050510);
@@ -63,24 +77,29 @@
         // --- 1. الكوكب الرئيسي ---
         const earthGeo = new THREE.SphereGeometry(2.1, 80, 80);
         const earthMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff, 
+            color: 0x4488aa,
             roughness: 0.3, 
             metalness: 0.1,
-            emissive: new THREE.Color(0x111122)
+            emissive: new THREE.Color(0x112233)
         });
         const earth = new THREE.Mesh(earthGeo, earthMat);
         earth.position.set(-1, 0, 0);
         scene.add(earth);
 
+        // محاولة تحميل الصورة (إذا لم توجد سيتم استخدام اللون الافتراضي)
         const loader = new THREE.TextureLoader();
         loader.load('./myimage.jpg', 
             (tex) => {
                 earthMat.map = tex;
                 earthMat.needsUpdate = true;
+                earthMat.color.setHex(0xffffff);
                 earthMat.emissive.setHex(0x000000);
             },
             undefined,
-            (err) => console.warn('لم يتم العثور على myimage.jpg', err)
+            (err) => {
+                console.warn('لم يتم العثور على myimage.jpg، سيتم استخدام اللون الافتراضي', err);
+                earthMat.color.setHex(0x4488aa);
+            }
         );
 
         // --- 2. الغبار الفضائي (Nebula) ---
@@ -267,7 +286,7 @@
         ];
 
         const namedStars = [];
-        const starMeshes = []; // لتخزين الـ Mesh للتصادم
+        const starMeshes = [];
 
         names.forEach((name, index) => {
             const pos = starPositions[index % starPositions.length];
@@ -473,25 +492,10 @@
         }
 
         renderer.domElement.addEventListener('click', onMouseClick);
-        // دعم اللمس على الأجهزة المحمولة
         renderer.domElement.addEventListener('touchstart', (event) => {
             event.preventDefault();
             const touch = event.touches[0];
             onMouseClick({ clientX: touch.clientX, clientY: touch.clientY });
         }, { passive: false });
 
-        // --- 10. تحديث المتفجرات (حركة وتلاشي) ---
-        function updateExplosions(deltaTime) {
-            for (let i = explosionParticles.length - 1; i >= 0; i--) {
-                const exp = explosionParticles[i];
-                exp.age += deltaTime;
-                
-                if (exp.age >= exp.maxAge) {
-                    scene.remove(exp.system);
-                    exp.system.geometry.dispose();
-                    exp.system.material.dispose();
-                    explosionParticles.splice(i, 1);
-                    continue;
-                }
-
-                const p
+    
