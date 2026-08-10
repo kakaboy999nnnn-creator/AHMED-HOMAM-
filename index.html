@@ -1,491 +1,462 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>فن يحچي 3D — نجوم بيضاء</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Arial','Tahoma',sans-serif; }
-  canvas { display:block; }
-  .info { position:fixed; bottom:18px; left:18px; color:rgba(255,255,255,.28); font-size:12px; letter-spacing:1px; z-index:10; pointer-events:none; text-shadow:0 0 6px rgba(0,0,0,.9); direction:rtl; }
-  .hint { position:fixed; bottom:18px; right:18px; color:rgba(255,255,255,.2); font-size:11px; z-index:10; pointer-events:none; direction:rtl; }
-  #loader { position:fixed; inset:0; background:#000; color:rgba(255,255,255,.55); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:99; font-size:14px; letter-spacing:1px; text-align:center; padding:20px; direction:rtl; transition:opacity .8s ease; }
-  #errBox { color:#ff6b6b; font-size:13px; max-width:580px; line-height:1.9; display:none; white-space:pre-wrap; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فن يحچي 3D - نجوم بيضاء</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000000; font-family: 'Arial', 'Tahoma', sans-serif; }
+        canvas { display: block; }
+        .info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.3);
+            font-size: 12px;
+            pointer-events: none;
+            font-family: 'Arial', sans-serif;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+    </style>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-<div id="loader">
-  <div>✨ جاري تشكيل الكون…</div>
-  <div id="errBox"></div>
-</div>
-<div class="info">✨ فن يحچي • اسحب للتدوير • عجلة الفأرة للتقريب</div>
-<div class="hint">☄️ ترقّب الشهب العابرة</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
-</script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js">
-</script>
-
+    <div class="info">✨ فن يحچي • اسحب للتدوير</div>
 <script>
-'use strict';
-  var loaderEl = document.getElementById('loader');
-  var errBox = document.getElementById('errBox');
+    (function() {
+        // --- المشهد، الكاميرا، المُعَرِّض ---
+        const scene = new THREE.Scene();
+        // خلفية سوداء خالصة
+        scene.background = new THREE.Color(0x000000);
 
-  function showError(msg){
-    if (!errBox) return;
-    errBox.style.display = 'block';
-    errBox.textContent = '⚠️ حدث خطأ:\n' + msg +
-      '\n\nحلول سريعة:\n- افتح الصفحة في متصفح Chrome أو Edge على الحاسوب.\n- تأكد من اتصال الإنترنت (المكتبات تُحمَّل من الإنترنت).\n- انسخ نص الخطأ أعلاه وأرسله لي لأساعدك بالضبط.';
-  }
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 9);
+        camera.lookAt(0, 0, 0);
 
-  window.addEventListener('error', function(e){
-    if (e && e.message && e.message.indexOf('Script error') === -1) showError(e.message);
-  });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
 
-  function webglOK(){
-    try {
-      var c = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
-    } catch(e){ return false; }
-  }
+        // التحكم بالكاميرا
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.target.set(0, 0, 0);
+        controls.rotateSpeed = 0.7;
+        controls.zoomSpeed = 1.0;
 
-  // Wait for scripts to load
-  function waitForThree(cb, attempts){
-    attempts = attempts || 0;
-    if (typeof THREE !== 'undefined'){
-      cb();
-    } else if (attempts < 50){
-      setTimeout(function(){ waitForThree(cb, attempts+1); }, 200);
-    } else {
-      showError('لم يتم تحميل مكتبة Three.js — تحقق من اتصال الإنترنت.');
-    }
-  }
+        // ساعة داخلية لحساب الزمن الحقيقي
+        const clock = new THREE.Clock();
 
-  waitForThree(function(){
-    if (!webglOK()){
-      showError('متصفحك لا يدعم WebGL. استخدم Chrome أو Firefox أو Edge.');
-      return;
-    }
-    try { main(); }
-    catch(e){
-      showError((e && e.message ? e.message : e) + (e && e.stack ? '\nفي: ' + e.stack.split('\n')[1] : ''));
-    }
-  });
+        // --- إضاءة ---
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(1, 2, 4);
+        scene.add(dirLight);
+        const backLight = new THREE.DirectionalLight(0x446688, 0.6);
+        backLight.position.set(-2, 0, -3);
+        scene.add(backLight);
 
-  function main(){
-    const rand    = (a,b) => a + Math.random()*(b-a);
-    const randDir = () => {
-      const th = Math.random()*Math.PI*2;
-      const ph = Math.acos(rand(-1,1));
-      return new THREE.Vector3(Math.sin(ph)*Math.cos(th), Math.sin(ph)*Math.sin(th), Math.cos(ph));
-    };
-    const IS_MOBILE = window.innerWidth<768 || (navigator.maxTouchPoints||0)>1;
-    const D = IS_MOBILE ? 0.5 : 1;
+        // --- 1. الكوكب الرئيسي ---
+        const earthGeo = new THREE.SphereGeometry(2.1, 80, 80);
+        const earthMat = new THREE.MeshStandardMaterial({ 
+            color: 0x4488aa,
+            roughness: 0.3, 
+            metalness: 0.1,
+            emissive: new THREE.Color(0x112233)
+        });
+        const earth = new THREE.Mesh(earthGeo, earthMat);
+        earth.position.set(-1, 0, 0);
+        scene.add(earth);
 
-    // Scene, camera, renderer
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.FogExp2(0x000000, 0.0008);
+        // محاولة تحميل الصورة
+        const loader = new THREE.TextureLoader();
+        loader.load('./myimage.jpg', 
+            (tex) => {
+                earthMat.map = tex;
+                earthMat.needsUpdate = true;
+                earthMat.color.setHex(0xffffff);
+                earthMat.emissive.setHex(0x000000);
+            },
+            undefined,
+            (err) => {
+                console.warn('لم يتم العثور على myimage.jpg، سيتم استخدام اللون الافتراضي', err);
+                earthMat.color.setHex(0x4488aa);
+            }
+        );
 
-    const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 400);
-    camera.position.set(2.2, 4.5, 19);
+        // --- 2. الغبار الفضائي (Nebula) ---
+        const nebulaGeo = new THREE.SphereGeometry(18, 48, 48);
+        const nebulaCanvas = document.createElement('canvas');
+        nebulaCanvas.width = 512; nebulaCanvas.height = 512;
+        const ctx = nebulaCanvas.getContext('2d');
+        ctx.fillStyle = '#000000'; 
+        ctx.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 120; i++) {
+            const r = 10 + Math.random() * 50;
+            const g = 10 + Math.random() * 30;
+            const b = 30 + Math.random() * 60;
+            ctx.fillStyle = `rgba(${r|0}, ${g|0}, ${b|0}, ${Math.random() * 0.25 + 0.05})`;
+            ctx.beginPath();
+            ctx.arc(Math.random() * 512, Math.random() * 512, Math.random() * 180 + 20, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        for (let i = 0; i < 20; i++) {
+            ctx.fillStyle = `rgba(40, 30, 80, ${Math.random() * 0.1})`;
+            ctx.beginPath();
+            ctx.arc(Math.random() * 512, Math.random() * 512, Math.random() * 60 + 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        const nebulaMat = new THREE.MeshBasicMaterial({
+            map: new THREE.CanvasTexture(nebulaCanvas),
+            side: THREE.BackSide,
+            transparent: true,
+            opacity: 0.35
+        });
+        const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
+        scene.add(nebula);
 
-    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false, powerPreference:'high-performance' });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE ? 1.6 : 2));
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.setClearColor(0x000000, 1);
-    document.body.appendChild(renderer.domElement);
+        // --- 3. الكويكب Ali (متعدد الألوان ومتغيّر باستمرار) ---
+        const aliGeo = new THREE.SphereGeometry(0.8, 48, 48);
 
-    // Controls
-    let controls = null;
-    if (THREE.OrbitControls){
-      controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.07;
-      controls.autoRotate = false;
-      controls.target.set(0, 0.5, 0);
-      controls.minDistance = 3.4;
-      controls.maxDistance = 30;
-      controls.minPolarAngle = 0.2;
-      controls.maxPolarAngle = Math.PI - 0.2;
-      controls.enabled = true;
-      controls.update();
-    }
+        const aliCanvas = document.createElement('canvas');
+        aliCanvas.width = 256; aliCanvas.height = 256;
+        const aliCtx = aliCanvas.getContext('2d');
+        const aliGrad = aliCtx.createLinearGradient(0, 0, 256, 256);
+        aliGrad.addColorStop(0.00, '#ff0080');
+        aliGrad.addColorStop(0.18, '#ff8c00');
+        aliGrad.addColorStop(0.36, '#ffee00');
+        aliGrad.addColorStop(0.54, '#00ff88');
+        aliGrad.addColorStop(0.72, '#00baff');
+        aliGrad.addColorStop(0.90, '#a000ff');
+        aliGrad.addColorStop(1.00, '#ff0080');
+        aliCtx.fillStyle = aliGrad;
+        aliCtx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 220; i++) {
+            aliCtx.fillStyle = `hsla(${Math.random() * 360}, 100%, 65%, ${Math.random() * 0.35})`;
+            aliCtx.beginPath();
+            aliCtx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 18 + 2, 0, Math.PI * 2);
+            aliCtx.fill();
+        }
+        const aliTexture = new THREE.CanvasTexture(aliCanvas);
+        aliTexture.wrapS = THREE.RepeatWrapping;
+        aliTexture.wrapT = THREE.RepeatWrapping;
 
-    const clock = new THREE.Clock();
-    let elapsed = 0;
-    let introProgress = 0;
-    const INTRO_DURATION = 4.5;
-    const INTRO_FROM = new THREE.Vector3(2.2, 4.5, 19);
-    const INTRO_TO   = new THREE.Vector3(0, 2.2, 11);
+        const aliMat = new THREE.MeshStandardMaterial({
+            map: aliTexture,
+            color: 0xffffff,
+            emissive: new THREE.Color(0xffffff),
+            emissiveMap: aliTexture,
+            emissiveIntensity: 0.5,
+            roughness: 0.25,
+            metalness: 0.6
+        });
+        const ali = new THREE.Mesh(aliGeo, aliMat);
+        ali.position.set(2.8, 0, 0);
+        scene.add(ali);
 
-    // Lighting
-    scene.add(new THREE.AmbientLight(0x334466, 0.55));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.35);
-    dirLight.position.set(3, 5, 7);
-    scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0x6688bb, 0.5);
-    fillLight.position.set(-4, -1, -2);
-    scene.add(fillLight);
-    const rimLight = new THREE.PointLight(0x88ccff, 0.9, 30);
-    rimLight.position.set(-6, 3, -4);
-    scene.add(rimLight);
+        // --- 4. النصوص (العنوان واسم Ali) ---
+        function createText(text, color, yPos, xPos, size = 3.2, fontSize = 80) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = color;
+            ctx.font = `Bold ${fontSize}px 'Arial', 'Tahoma', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillText(text, 256, 64);
+            ctx.shadowColor = 'transparent';
+            ctx.fillText(text, 256, 64);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.needsUpdate = true;
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.35), mat);
+            mesh.position.set(xPos, yPos, 0.05);
+            return mesh;
+        }
 
-    // Planet group
-    const planetGroup = new THREE.Group();
-    planetGroup.position.set(-1, 0, 0);
-    scene.add(planetGroup);
+        const titleText = createText('فن يحچي', '#ffffff', 3.4, -1, 3.8, 90);
+        scene.add(titleText);
+        const aliText = createText('Ali', '#ff66ff', 1.5, 2.8, 2.2, 70);
+        scene.add(aliText);
 
-    const earthMat = new THREE.MeshStandardMaterial({
-      color: 0x4488aa, roughness: 0.32, metalness: 0.12, emissive: 0x112233
-    });
-    const earth = new THREE.Mesh(new THREE.SphereGeometry(2.1, 96, 96), earthMat);
-    planetGroup.add(earth);
+        // --- 5. نظام النجوم الأساسي (الكثيف) ---
+        const starsCount = 6000;
+        const starsGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(starsCount * 3);
+        const colors = new Float32Array(starsCount * 3);
+        const sizes = new Float32Array(starsCount);
 
-    // Clouds
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.16, roughness: 0.9,
-      depthWrite: false, side: THREE.FrontSide
-    });
-    const clouds = new THREE.Mesh(new THREE.SphereGeometry(2.17, 64, 64), cloudMat);
-    planetGroup.add(clouds);
+        const radius = 40;
+        for (let i = 0; i < starsCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = radius * Math.cbrt(Math.random());
+            positions[i*3] = Math.sin(phi) * Math.cos(theta) * r;
+            positions[i*3+1] = Math.sin(phi) * Math.sin(theta) * r;
+            positions[i*3+2] = Math.cos(phi) * r;
 
-    // Atmosphere glow
-    const atmosphere = new THREE.Mesh(
-      new THREE.SphereGeometry(2.55, 48, 48),
-      new THREE.ShaderMaterial({
-        uniforms: { glowColor: { value: new THREE.Color(0x3a8fd4) } },
-        vertexShader: 'varying vec3 vNormal; varying vec3 vPosition; void main(){ vNormal = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vPosition = mv.xyz; gl_Position = projectionMatrix * mv; }',
-        fragmentShader: 'uniform vec3 glowColor; varying vec3 vNormal; varying vec3 vPosition; void main(){ vec3 V = normalize(-vPosition); float i = pow(0.68 - dot(V, vNormal), 2.5); gl_FragColor = vec4(glowColor, i * 0.9); }',
-        side: THREE.BackSide, transparent: true,
-        blending: THREE.AdditiveBlending, depthWrite: false
-      })
-    );
-    planetGroup.add(atmosphere);
+            const colorVal = 0.5 + Math.random() * 0.3;
+            colors[i*3] = colorVal;
+            colors[i*3+1] = colorVal * (0.8 + Math.random() * 0.2);
+            colors[i*3+2] = colorVal * (0.9 + Math.random() * 0.1);
+            sizes[i] = 0.04 + Math.random() * 0.2;
+        }
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-    // Ring
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(3.05, 4.4, 96),
-      new THREE.MeshBasicMaterial({
-        color: 0x88bbdd, transparent: true, opacity: 0.14,
-        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
-      })
-    );
-    ring.rotation.x = Math.PI / 2.55;
-    ring.rotation.z = 0.4;
-    planetGroup.add(ring);
+        const starCanvas = document.createElement('canvas');
+        starCanvas.width = 32; starCanvas.height = 32;
+        const sCtx = starCanvas.getContext('2d');
+        const gradient = sCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(0.3, 'rgba(255,255,255,0.9)');
+        gradient.addColorStop(0.7, 'rgba(200,200,255,0.5)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        sCtx.fillStyle = gradient;
+        sCtx.fillRect(0, 0, 32, 32);
+        const starTexture = new THREE.CanvasTexture(starCanvas);
 
-    // Moon
-    const moonOrbit = new THREE.Object3D();
-    planetGroup.add(moonOrbit);
-    const moon = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 24, 24),
-      new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.7, metalness: 0.05, emissive: 0x111111 })
-    );
-    moon.position.set(4.5, 0, 0);
-    moonOrbit.add(moon);
+        const starsMaterial = new THREE.PointsMaterial({
+            size: 0.15,
+            map: starTexture,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            transparent: true,
+            vertexColors: true,
+            opacity: 0.7,
+            sizeAttenuation: true
+        });
+        const stars = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(stars);
 
-    // Try loading texture
-    const loader = new THREE.TextureLoader();
-    loader.load('./myimage.jpg',
-      function(tex){
-        earthMat.map = tex;
-        earthMat.color.setHex(0xffffff);
-        earthMat.emissive.setHex(0x000000);
-        earthMat.needsUpdate = true;
-      },
-      undefined,
-      function(){ console.warn('myimage.jpg غير موجود - استخدام اللون الافتراضي'); }
-    );
+        // --- 6. نجوم إضافية صغيرة جداً ---
+        const tinyStarsCount = 4000;
+        const tinyGeo = new THREE.BufferGeometry();
+        const tinyPos = new Float32Array(tinyStarsCount * 3);
+        for (let i = 0; i < tinyStarsCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 60 + Math.random() * 30;
+            tinyPos[i*3] = Math.sin(phi) * Math.cos(theta) * r;
+            tinyPos[i*3+1] = Math.sin(phi) * Math.sin(theta) * r;
+            tinyPos[i*3+2] = Math.cos(phi) * r;
+        }
+        tinyGeo.setAttribute('position', new THREE.BufferAttribute(tinyPos, 3));
+        const tinyMat = new THREE.PointsMaterial({
+            color: 0x446688,
+            size: 0.06,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true
+        });
+        const tinyStars = new THREE.Points(tinyGeo, tinyMat);
+        scene.add(tinyStars);
 
-    // Nebula function
-    function createNebula(radius, colorFn, opacity, count){
-      const canvas = document.createElement('canvas');
-      canvas.width = 512; canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#000'; ctx.fillRect(0,0,512,512);
-      for (let i=0;i<count;i++){
-        const c = colorFn();
-        ctx.fillStyle = 'rgba(' + (c[0]|0) + ',' + (c[1]|0) + ',' + (c[2]|0) + ',' + rand(0.04,0.22) + ')';
-        ctx.beginPath();
-        ctx.arc(rand(0,512), rand(0,512), rand(20,190), 0, Math.PI*2);
-        ctx.fill();
-      }
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(radius, 48, 48),
-        new THREE.MeshBasicMaterial({
-          map: new THREE.CanvasTexture(canvas), side: THREE.BackSide,
-          transparent: true, opacity: opacity,
-          blending: THREE.AdditiveBlending, depthWrite: false
-        })
-      );
-      return mesh;
-    }
+        // --- 7. النجوم المخصصة بالأسماء (تدور حول نفسها فقط) ---
+        const names = [
+            "رَوَاحة الكُبْرى",
+            "جَواهِر",
+            "ابو ذيبة",
+            "المسيحي",
+            "ضُّحَى",
+            "إِسْكَنْدَر",
+            "Dha",
+            "جورج وسوف",
+            "Nyar",
+            "توجان",
+            "لَوْذَع",
+            "بنين",
+            "لوزه",
+            "Cherry"
+        ];
 
-    const nebula = createNebula(22, function(){ return [rand(12,70), rand(8,35), rand(40,120)]; }, 0.30, 140);
-    scene.add(nebula);
-    const nebula2 = createNebula(15, function(){ return [rand(60,110), rand(20,50), rand(90,160)]; }, 0.22, 90);
-    nebula2.rotation.z = 1.2; nebula2.rotation.x = 0.5;
-    scene.add(nebula2);
+        const starPositions = [
+            { x: -2.5, y: 1.8, z: 2.5 },
+            { x: 1.2, y: 2.5, z: 2.0 },
+            { x: 3.5, y: -1.2, z: 1.8 },
+            { x: -3.0, y: -2.0, z: 2.2 },
+            { x: 0.5, y: -2.8, z: 2.0 },
+            { x: -1.8, y: 2.8, z: 1.5 },
+            { x: 2.8, y: 1.0, z: 2.8 },
+            { x: -3.8, y: -0.5, z: 2.0 },
+            { x: -1.2, y: -2.2, z: 2.8 },
+            { x: 3.0, y: 2.2, z: 1.2 },
+            { x: -2.8, y: -1.8, z: 2.5 },
+            { x: 1.8, y: -1.0, z: 3.0 },
+            { x: -0.5, y: 2.2, z: 3.2 },
+            { x: 4.0, y: 0.5, z: 1.5 }
+        ];
 
-    // Ali asteroid
-    const aliCanvas = document.createElement('canvas');
-    aliCanvas.width = 256; aliCanvas.height = 256;
-    const aliCtx = aliCanvas.getContext('2d');
-    const aliGrad = aliCtx.createLinearGradient(0,0,256,256);
-    ['#ff0080','#ff8c00','#ffee00','#00ff88','#00baff','#a000ff','#ff0080'].forEach(function(c,i){
-      aliGrad.addColorStop(i/6, c);
-    });
-    aliCtx.fillStyle = aliGrad; aliCtx.fillRect(0,0,256,256);
-    for (let i=0;i<220;i++){
-      aliCtx.fillStyle = 'hsla(' + rand(0,360) + ',100%,65%,' + rand(0,0.35) + ')';
-      aliCtx.beginPath();
-      aliCtx.arc(rand(0,256), rand(0,256), rand(2,20), 0, Math.PI*2);
-      aliCtx.fill();
-    }
-    const aliTexture = new THREE.CanvasTexture(aliCanvas);
-    aliTexture.wrapS = aliTexture.wrapT = THREE.RepeatWrapping;
+        const namedStars = [];
 
-    const aliMat = new THREE.MeshStandardMaterial({
-      map: aliTexture, color: 0xffffff, emissive: 0xffffff,
-      emissiveMap: aliTexture, emissiveIntensity: 0.5,
-      roughness: 0.25, metalness: 0.6
-    });
-    const ali = new THREE.Mesh(new THREE.SphereGeometry(0.8, 64, 64), aliMat);
-    ali.position.set(2.8, 0, 0);
-    scene.add(ali);
-    const aliGlow = new THREE.Mesh(
-      new THREE.SphereGeometry(1.15, 24, 24),
-      new THREE.MeshBasicMaterial({
-        color: 0x66aaff, transparent: true, opacity: 0.08,
-        blending: THREE.AdditiveBlending, depthWrite: false
-      })
-    );
-    ali.add(aliGlow);
+        names.forEach((name, index) => {
+            const pos = starPositions[index % starPositions.length];
+            const offsetX = (Math.random() - 0.5) * 0.3;
+            const offsetY = (Math.random() - 0.5) * 0.3;
+            const offsetZ = (Math.random() - 0.5) * 0.3;
+            const finalPos = {
+                x: pos.x + offsetX,
+                y: pos.y + offsetY,
+                z: pos.z + offsetZ
+            };
 
-    // Text function
-    function createText(text, color, yPos, xPos, size, fontSize){
-      size = size || 3.2; fontSize = fontSize || 80;
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024; canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 14;
-      ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-      ctx.fillStyle = color;
-      ctx.font = 'Bold ' + fontSize + 'px Arial, Tahoma, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(text, 512, 64);
-      ctx.shadowColor = 'rgba(0,0,0,0)';
-      ctx.fillText(text, 512, 64);
-      const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(size, size*0.35),
-        new THREE.MeshBasicMaterial({
-          map: new THREE.CanvasTexture(canvas), transparent: true,
-          depthWrite: false, side: THREE.DoubleSide
-        })
-      );
-      mesh.position.set(xPos, yPos, 0.05);
-      return mesh;
-    }
-    scene.add(createText('فن يحچي', '#ffffff', 3.4, -1, 3.8, 90));
-    scene.add(createText('Ali', '#ff66ff', 1.5, 2.8, 2.2, 70));
+            // نجمة بيضاء
+            const starGeo = new THREE.SphereGeometry(0.22, 16, 16);
+            const starMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.5,
+                roughness: 0.1,
+                metalness: 0.0
+            });
+            const starMesh = new THREE.Mesh(starGeo, starMat);
+            starMesh.position.set(finalPos.x, finalPos.y, finalPos.z);
+            scene.add(starMesh);
 
-    // Stars shader
-    const starCount = Math.floor(9000 * D);
-    const sPos = new Float32Array(starCount*3);
-    const sCol = new Float32Array(starCount*3);
-    const sSiz = new Float32Array(starCount);
-    const sTwk = new Float32Array(starCount*2);
-    for (let i=0;i<starCount;i++){
-      const th = Math.random()*Math.PI*2;
-      const ph = Math.acos(rand(-1,1));
-      const r  = 35 * Math.cbrt(Math.random()) + 8;
-      sPos[i*3]   = Math.sin(ph)*Math.cos(th)*r;
-      sPos[i*3+1] = Math.sin(ph)*Math.sin(th)*r;
-      sPos[i*3+2] = Math.cos(ph)*r;
-      const t = Math.random();
-      const c = new THREE.Color().setHSL(0.6 - t*0.6, 0.35 + t*0.45, 0.65 + t*0.3);
-      sCol[i*3] = c.r; sCol[i*3+1] = c.g; sCol[i*3+2] = c.b;
-      sSiz[i] = (0.05 + Math.pow(Math.random(), 3.2) * 0.75) * (IS_MOBILE ? 1.6 : 1);
-      sTwk[i*2]   = rand(0.6, 2.6);
-      sTwk[i*2+1] = rand(0, Math.PI*2);
-    }
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-    starGeo.setAttribute('customColor', new THREE.BufferAttribute(sCol, 3));
-    starGeo.setAttribute('size', new THREE.BufferAttribute(sSiz, 1));
-    starGeo.setAttribute('twinkle', new THREE.BufferAttribute(sTwk, 2));
+            // هالة بيضاء
+            const glowGeo = new THREE.SphereGeometry(0.35, 8, 8);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+            glowMesh.position.copy(starMesh.position);
+            scene.add(glowMesh);
 
-    const starTexCanvas = document.createElement('canvas');
-    starTexCanvas.width = starTexCanvas.height = 64;
-    const stx = starTexCanvas.getContext('2d');
-    const sg = stx.createRadialGradient(32,32,0,32,32,32);
-    sg.addColorStop(0,'rgba(255,255,255,1)');
-    sg.addColorStop(0.25,'rgba(255,255,255,0.85)');
-    sg.addColorStop(0.6,'rgba(200,210,255,0.3)');
-    sg.addColorStop(1,'rgba(255,255,255,0)');
-    stx.fillStyle = sg; stx.fillRect(0,0,64,64);
+            // اسم الشخص
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 128;
+            const ctx2 = canvas.getContext('2d');
+            ctx2.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx2.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx2.shadowBlur = 16;
+            ctx2.shadowOffsetX = 2;
+            ctx2.shadowOffsetY = 2;
+            
+            ctx2.fillStyle = '#ffffff';
+            ctx2.font = 'Bold 68px "Arial", "Tahoma", sans-serif';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(name, 256, 64);
+            
+            ctx2.shadowColor = 'transparent';
+            ctx2.fillStyle = '#ffffff';
+            ctx2.font = 'Bold 68px "Arial", "Tahoma", sans-serif';
+            ctx2.fillText(name, 256, 64);
+            
+            ctx2.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx2.shadowBlur = 8;
+            ctx2.fillStyle = '#ffffff';
+            ctx2.fillText(name, 256, 64);
 
-    const starsMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTexture: { value: new THREE.CanvasTexture(starTexCanvas) },
-        uTime:    { value: 0 },
-        uPixelRatio: { value: renderer.getPixelRatio() }
-      },
-      vertexShader: [
-        'attribute float size;',
-        'attribute vec2 twinkle;',
-        'attribute vec3 customColor;',
-        'uniform float uTime;',
-        'uniform float uPixelRatio;',
-        'varying vec3 vColor;',
-        'varying float vTwinkle;',
-        'void main(){',
-        '  vColor = customColor;',
-        '  vTwinkle = 0.72 + 0.28 * sin(uTime * twinkle.x + twinkle.y);',
-        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
-        '  gl_PointSize = clamp(size * uPixelRatio * (300.0 / -mv.z), 1.0, 128.0);',
-        '  gl_Position = projectionMatrix * mv;',
-        '}'
-      ].join('\n'),
-      fragmentShader: [
-        'uniform sampler2D uTexture;',
-        'varying vec3 vColor;',
-        'varying float vTwinkle;',
-        'void main(){',
-        '  vec4 tex = texture2D(uTexture, gl_PointCoord);',
-        '  gl_FragColor = vec4(vColor, 1.0) * tex * vTwinkle;',
-        '}'
-      ].join('\n'),
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
-    });
-    const stars = new THREE.Points(starGeo, starsMat);
-    scene.add(stars);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            const spriteMat = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                opacity: 0.95
+            });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.set(finalPos.x, finalPos.y + 0.7, finalPos.z);
+            sprite.scale.set(1.6, 0.4, 1);
+            scene.add(sprite);
 
-    // Tiny background stars
-    const tinyCount = Math.floor(4000 * D);
-    const tinyGeo = new THREE.BufferGeometry();
-    const tinyPos = new Float32Array(tinyCount*3);
-    for (let i=0;i<tinyCount;i++){
-      const d = randDir().multiplyScalar(rand(60, 90));
-      tinyPos[i*3] = d.x; tinyPos[i*3+1] = d.y; tinyPos[i*3+2] = d.z;
-    }
-    tinyGeo.setAttribute('position', new THREE.BufferAttribute(tinyPos, 3));
-    const tinyStars = new THREE.Points(tinyGeo, new THREE.PointsMaterial({
-      color: 0x446688, size: 0.06, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
-    }));
-    scene.add(tinyStars);
+            namedStars.push({
+                star: starMesh,
+                glow: glowMesh,
+                label: sprite,
+                basePos: new THREE.Vector3(finalPos.x, finalPos.y, finalPos.z),
+                phase: Math.random() * Math.PI * 2,
+                rotSpeed: 0.02 + Math.random() * 0.03
+            });
+        });
 
-    // Spiral galaxies
-    function createGalaxy(p){
-      const count = Math.floor(p.count * D);
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(count*3);
-      const colors = new Float32Array(count*3);
-      const inside = new THREE.Color(p.inside);
-      const outside = new THREE.Color(p.outside);
-      for (let i=0;i<count;i++){
-        const i3 = i*3;
-        const r = Math.random() * p.radius;
-        const spinAngle = r * p.spin;
-        const branchAngle = (i % p.branches) / p.branches * Math.PI * 2;
-        const rndX = Math.pow(Math.random(), p.rndPower) * (Math.random()<0.5?1:-1) * p.rnd * r;
-        const rndY = Math.pow(Math.random(), p.rndPower) * (Math.random()<0.5?1:-1) * p.rnd * r * 0.4;
-        const rndZ = Math.pow(Math.random(), p.rndPower) * (Math.random()<0.5?1:-1) * p.rnd * r;
-        positions[i3]   = Math.cos(branchAngle + spinAngle) * r + rndX;
-        positions[i3+1] = rndY;
-        positions[i3+2] = Math.sin(branchAngle + spinAngle) * r + rndZ;
-        const m = inside.clone().lerp(outside, r/p.radius);
-        colors[i3] = m.r; colors[i3+1] = m.g; colors[i3+2] = m.b;
-      }
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions,3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors,3));
-      const points = new THREE.Points(geometry, new THREE.PointsMaterial({
-        size: p.size, sizeAttenuation: true, depthWrite: false,
-        blending: THREE.AdditiveBlending, vertexColors: true,
-        transparent: true, opacity: 0.92
-      }));
-      points.position.copy(p.position);
-      points.rotation.set(p.rotX, p.rotY, p.rotZ);
-      scene.add(points);
-      return points;
-    }
+        // --- 8. التحريك الرئيسي ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1);
+            const elapsed = clock.elapsedTime;
 
-    const galaxy1 = createGalaxy({
-      count: 12000, radius: 5.5, branches: 3, spin: 1.1,
-      rnd: 0.32, rndPower: 3, size: 0.16,
-      inside: 0xffd8a8, outside: 0x2a5b9e,
-      position: new THREE.Vector3(-7, 2.5, -10),
-      rotX: 1.25, rotY: 0.4, rotZ: 0.5
-    });
+            // دوران الكوكب
+            earth.rotation.y += 0.004;
+            earth.rotation.x += 0.001;
 
-    const galaxy2 = createGalaxy({
-      count: 8000, radius: 4.2, branches: 4, spin: 1.3,
-      rnd: 0.3, rndPower: 3, size: 0.13,
-      inside: 0xffb3d9, outside: 0x6a3fbf,
-      position: new THREE.Vector3(10, -1.5, -9),
-      rotX: -1.1, rotY: -0.5, rotZ: -0.4
-    });
+            // دوران وتلوين الكويكب Ali
+            ali.rotation.y += delta * 1.7;
+            ali.rotation.x += delta * 0.9;
+            ali.rotation.z += delta * 0.55;
+            aliTexture.offset.x = (aliTexture.offset.x + delta * 0.12) % 1;
+            aliTexture.offset.y = (aliTexture.offset.y + delta * 0.05) % 1;
+            aliMat.emissiveIntensity = 0.45 + Math.sin(elapsed * 2.2) * 0.25;
 
-    // Space dust
-    const dustCount = Math.floor(1300 * D);
-    const dustGeo = new THREE.BufferGeometry();
-    const dustPos = new Float32Array(dustCount*3);
-    const dustCol = new Float32Array(dustCount*3);
-    for (let i=0;i<dustCount;i++){
-      const d = randDir().multiplyScalar(rand(4, 26));
-      dustPos[i*3] = d.x; dustPos[i*3+1] = d.y; dustPos[i*3+2] = d.z;
-      const blue = rand(0.35, 0.6), violet = rand(0.3, 0.55);
-      dustCol[i*3] = blue; dustCol[i*3+1] = blue*0.75; dustCol[i*3+2] = violet;
-    }
-    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-    dustGeo.setAttribute('color', new THREE.BufferAttribute(dustCol, 3));
-    const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
-      size: 0.12, sizeAttenuation: true, transparent: true, opacity: 0.32,
-      blending: THREE.AdditiveBlending, depthWrite: false, vertexColors: true
-    }));
-    scene.add(dust);
+            // دوران السديم
+            nebula.rotation.y += 0.0002;
+            nebula.rotation.x += 0.0001;
 
-    // Meteors / shooting stars
-    const meteors = [];
-    const METEOR_COUNT = 6;
+            // دوران النجوم الخلفية
+            stars.rotation.y += 0.00006;
+            stars.rotation.x += 0.00001;
+            tinyStars.rotation.y -= 0.00004;
 
-    for (let i = 0; i < METEOR_COUNT; i++){
-      // Create tail line
-      const tailGeo = new THREE.BufferGeometry();
-      const tailPositions = new Float32Array([0,0,0, 0,0,-2.5]);
-      const tailColors = new Float32Array([1,0.95,0.85, 0.05,0.05,0.15]);
-      tailGeo.setAttribute('position', new THREE.BufferAttribute(tailPositions, 3));
-      tailGeo.setAttribute('color', new THREE.BufferAttribute(tailColors, 3));
+            // تحريك النجوم المخصصة (تدور حول نفسها وتهتز فقط)
+            const time = Date.now() * 0.001;
+            namedStars.forEach((item) => {
+                // دوران النجمة حول نفسها
+                item.star.rotation.x += item.rotSpeed;
+                item.star.rotation.y += item.rotSpeed * 1.3;
+                item.star.rotation.z += item.rotSpeed * 0.7;
+                
+                // اهتزاز بسيط في مكانها
+                const offset = Math.sin(time * 1.2 + item.phase) * 0.03;
+                item.star.position.y = item.basePos.y + offset;
+                item.glow.position.y = item.basePos.y + offset;
+                item.label.position.y = item.basePos.y + 0.7 + offset * 0.5;
+                
+                // تغير في شفافية الهالة
+                const pulse = Math.sin(time * 1.8 + item.phase) * 0.05 + 0.15;
+                item.glow.material.opacity = pulse;
+            });
 
-      const tailLine = new THREE.Line(tailGeo, new THREE.LineBasicMaterial({
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 0.85,
-        depthWrite: false
-      }));
+            controls.update();
+            renderer.render(scene, camera);
+        }
 
-      // Head glow
-      const headGlow = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 8, 8),
-        new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          transparent: true,
-          opacity: 0.9,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        })
-      );
+        animate();
 
-      const meteorGroup = new THREE.Group();
-      meteorGroup.add(tailLine);
-      meteorGroup.add(headGlow);
-      meteorGroup.visible = false;
+        // --- التكيف مع تغير حجم النافذة ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-      // Random initial position far away
-      const startPos = randDir().multiplyScalar(rand(25, 50));
-      meteo
+        console.log('✨ فن يحچي 3D - خلفية سوداء، نجوم بيضاء تدور حول نفسها!');
+    })();
+</script>
+</body>
+</html>
