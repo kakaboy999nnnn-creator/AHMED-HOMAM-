@@ -31,7 +31,7 @@
   function showError(msg){
     if (!errBox) return;
     errBox.style.display = 'block';
-    errBox.textContent = '⚠️ حدث خطأ:\n' + msg + '\n\nحلول سريعة:\n- افتح الصفحة في متصفح Chrome أو Edge على الحاسوب.\n- تأكد من اتصال الإنترنت.\n- انسخ نص الخطأ وأرسله لي لأساعدك.';
+    errBox.textContent = "⚠️ حدث خطأ:\n" + msg + "\n\nحلول سريعة:\n- افتح الصفحة في متصفح Chrome أو Edge على الحاسوب.\n- تأكد من اتصال الإنترنت (المكتبات تُحمَّل من الإنترنت).\n- انسخ نص الخطأ أعلاه وأرسله لي لأساعدك بالضبط.";
   }
   window.addEventListener('error', function(e){
     if (e && e.message) showError(e.message);
@@ -455,4 +455,5 @@
       );
       const group = new THREE.Group();
       group.add(line); group.add(head);
-      group.visible = false
+      group.visible = false;
+    
